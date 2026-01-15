@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 import chromadb
 from chromadb.config import Settings
 from models import Course, CourseChunk
-from sentence_transformers import SentenceTransformer
 
 
 @dataclass

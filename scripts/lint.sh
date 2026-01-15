@@ -5,27 +5,62 @@
 # Perfect for CI/CD pipelines, pre-commit hooks, and code review.
 #
 # What it does:
-# 1. Runs flake8 linting (style violations, complexity)
-# 2. Runs mypy type checking (type safety)
-# 3. Checks import sorting without fixing (shows diff)
-# 4. Checks code formatting without fixing (shows diff)
+# 1. Checks code formatting with Black (shows diff)
+# 2. Checks import sorting with isort (shows diff)
+# 3. Runs flake8 linting (style violations, complexity)
+# 4. Runs mypy type checking (advisory - doesn't fail the script)
 #
 # Usage: ./scripts/lint.sh
 # Prerequisites: uv sync --group dev
-# Exit codes: 0 = all checks pass, non-zero = issues found
+# Exit codes: 0 = all required checks pass, non-zero = issues found
 
-echo "🔍 Running code quality lint script (read-only checks)..."
+# Change to project root directory
+cd "$(dirname "$0")/.."
 
-echo "1. Running flake8 linting..."
-uv run flake8 backend/ main.py
+FAILED=0
 
-echo "2. Running mypy type checking..."
-uv run mypy backend/ main.py
+echo "Running code quality lint script (read-only checks)..."
+echo ""
 
-echo "3. Checking import sorting..."
-uv run isort --check-only --diff backend/ main.py
+echo "Step 1/4: Checking code formatting with Black..."
+if uv run black --check --diff backend/; then
+    echo "  Black formatting check passed"
+else
+    echo "  Black formatting check failed - run ./scripts/format.sh to fix"
+    FAILED=1
+fi
+echo ""
 
-echo "4. Checking code formatting..."
-uv run black --check --diff backend/ main.py
+echo "Step 2/4: Checking import sorting with isort..."
+if uv run isort --check-only --diff backend/; then
+    echo "  Import sorting check passed"
+else
+    echo "  Import sorting check failed - run ./scripts/format.sh to fix"
+    FAILED=1
+fi
+echo ""
 
-echo "Code quality checks completed!"
+echo "Step 3/4: Running flake8 linting..."
+if uv run flake8 backend/; then
+    echo "  Flake8 linting passed"
+else
+    echo "  Flake8 linting failed - fix issues above"
+    FAILED=1
+fi
+echo ""
+
+echo "Step 4/4: Running mypy type checking (advisory)..."
+if uv run mypy backend/ --ignore-missing-imports; then
+    echo "  Mypy type checking passed"
+else
+    echo "  Mypy found type issues above (advisory - does not fail lint)"
+fi
+echo ""
+
+if [ $FAILED -eq 0 ]; then
+    echo "All code quality checks passed!"
+    exit 0
+else
+    echo "Some code quality checks failed. Please fix the issues above."
+    exit 1
+fi

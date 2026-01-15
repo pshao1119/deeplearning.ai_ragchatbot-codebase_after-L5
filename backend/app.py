@@ -2,16 +2,17 @@ import warnings
 
 warnings.filterwarnings("ignore", message="resource_tracker: There appear to be.*")
 
-import os
-from typing import List, Optional
+import os  # noqa: E402
+from typing import List, Optional  # noqa: E402
 
-from config import config
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from rag_system import RAGSystem
+from config import config  # noqa: E402
+from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
+from rag_system import RAGSystem  # noqa: E402
 
 # Initialize FastAPI app
 app = FastAPI(title="Course Materials RAG System", root_path="")
@@ -63,11 +64,23 @@ class ClearSessionRequest(BaseModel):
     session_id: str
 
 
+# Custom static file handler with no-cache headers for development
+class DevStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: dict) -> FileResponse:
+        response = await super().get_response(path, scope)
+        if isinstance(response, FileResponse):
+            # Add no-cache headers for development
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
 # API Endpoints
 
 
 @app.post("/api/query", response_model=QueryResponse)
-async def query_documents(request: QueryRequest):
+async def query_documents(request: QueryRequest) -> QueryResponse:
     """Process a query and return response with sources"""
     try:
         # Create session if not provided
@@ -89,7 +102,7 @@ async def query_documents(request: QueryRequest):
 
 
 @app.get("/api/courses", response_model=CourseStats)
-async def get_course_stats():
+async def get_course_stats() -> CourseStats:
     """Get course analytics and statistics"""
     try:
         analytics = rag_system.get_course_analytics()
@@ -102,7 +115,7 @@ async def get_course_stats():
 
 
 @app.post("/api/clear-session")
-async def clear_session(request: ClearSessionRequest):
+async def clear_session(request: ClearSessionRequest) -> dict:
     """Clear a conversation session"""
     try:
         rag_system.session_manager.clear_session(request.session_id)
@@ -112,7 +125,7 @@ async def clear_session(request: ClearSessionRequest):
 
 
 @app.on_event("startup")
-async def startup_event():
+async def startup_event() -> None:
     """Load initial documents on startup"""
     docs_path = "../docs"
     if os.path.exists(docs_path):
@@ -124,26 +137,6 @@ async def startup_event():
             print(f"Loaded {courses} courses with {chunks} chunks")
         except Exception as e:
             print(f"Error loading documents: {e}")
-
-
-import os
-from pathlib import Path
-
-from fastapi.responses import FileResponse
-
-# Custom static file handler with no-cache headers for development
-from fastapi.staticfiles import StaticFiles
-
-
-class DevStaticFiles(StaticFiles):
-    async def get_response(self, path: str, scope):
-        response = await super().get_response(path, scope)
-        if isinstance(response, FileResponse):
-            # Add no-cache headers for development
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
-        return response
 
 
 # Serve static files for the frontend
